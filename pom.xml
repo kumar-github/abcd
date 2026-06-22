@@ -12,6 +12,10 @@
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <checkstyle.version>13.6.0</checkstyle.version>
+    <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
+    <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
+    <checkstyle.config.location>src/main/resources/checkstyle.xml</checkstyle.config.location>
   </properties>
 
   <dependencies>
@@ -29,6 +33,109 @@
         <groupId>org.sonarsource.scanner.maven</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>5.7.0.6970</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${checkstyle-plugin.version}</version>
+        <configuration>
+          <configLocation>${checkstyle.config.location}</configLocation>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+          <violationSeverity>warning</violationSeverity>
+          <logViolationsToConsole>true</logViolationsToConsole>
+          <logViolationCountToConsole>true</logViolationCountToConsole>
+          <failOnViolation>true</failOnViolation>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>${checkstyle.version}</version>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <id>checkstyle-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>validate</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco-plugin.version}</version>
+        <executions>
+          <!--
+              Execution 1: prepare-agent
+              Phase: initialize (before test compilation and test execution)
+              Purpose: Registers the JaCoCo Java agent
+          -->
+          <execution>
+            <id>jacoco-prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <phase>initialize</phase>
+          </execution>
+
+          <!--
+          Execution 2: report
+          Phase: verify (after test phase completes)
+          Purpose: Reads jacoco.exec and generates reports
+          -->
+          <execution>
+            <id>jacoco-report</id>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <formats>
+                <!-- human-readable -->
+                <format>HTML</format>
+                <!-- consumed by SonarQube -->
+                <format>XML</format>
+              </formats>
+            </configuration>
+          </execution>
+
+          <!--
+          Execution 3: check
+          Phase: verify (runs after jacoco-report due to execution order)
+          Purpose: Enforces the coverage gate. Fails the build if LINE coverage across the entire project bundle
+          falls below 80%. haltOnFailure=true is the default but stated explicitly so CI intent is self-documenting.
+          -->
+          <execution>
+            <id>jacoco-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <haltOnFailure>true</haltOnFailure>
+              <rules>
+                <rule>
+                  <!--
+                  BUNDLE measures coverage across the whole project as one unit. More practical than CLASS-level rules
+                  for a library — avoids build failures from a single small utility class being slightly under a
+                  threshold.
+                  -->
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.80</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
